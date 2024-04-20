@@ -40,7 +40,6 @@ namespace {
 
       out << "Total loops found: " << loopCount << "\n";
 
-      // Assuming all analyses are preserved, we don't modify the IR.
       return PreservedAnalyses::all();
     }
   };
@@ -48,31 +47,33 @@ namespace {
   struct LoopPerforationPass : public PassInfoMixin<LoopPerforationPass> {
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM) {
       auto &LI = FAM.getResult<LoopAnalysis>(F);
+      raw_ostream &out = llvm::errs();
       bool changed = false;
 
+      out << "Function \"" << F.getName() << "\" has the following loops:\n";
+
       for (Loop *L : LI) {
+        out << "Loop level " << L->getLoopDepth() << " with "
+            << L->getNumBlocks() << " blocks.\n";
         if (Loop *ParentLoop = L->getParentLoop())
           continue; // Only perforate innermost loops for simplicity
 
         for (BasicBlock *BB : L->getBlocks()) {
           for (Instruction &I : *BB) {
-            if (auto *BI = dyn_cast<BranchInst>(&I)) {
-              if (BI->isConditional()) {
-                continue;
-              }
-            }
-
             // Look for the increment statement of the induction variable
             if (auto *II = dyn_cast<BinaryOperator>(&I)) {
               if (II->getOpcode() == Instruction::Add && II->getOperand(1)->getType()->isIntegerTy()) {
                 Value *increment = II->getOperand(1);
-                auto *constInc = dyn_cast<ConstantInt>(increment);
-
-                if (constInc && constInc->getValue() == 1) {
-                  // Change the increment from +1 to +2 to skip iterations
-                  Value *newIncrement = ConstantInt::get(increment->getType(), 2);
-                  II->setOperand(1, newIncrement);
-                  changed = true;
+                if (auto *constInc = dyn_cast<ConstantInt>(increment)) {
+                  if (constInc->isOne()) { // Ensure we are incrementing by 1
+                    // Change the increment from +1 to +2 to skip iterations
+                    out << "Old instruction: " << *II << "\n";
+                    Value *newIncrement = ConstantInt::get(increment->getType(), 2);
+                    II->setOperand(1, newIncrement);
+                    changed = true;
+                    out << "New instruction: " << *II << "\n";
+                    out << "Perforated a loop in function \"" << F.getName() << "\" at block " << BB->getName() << ".\n";
+                  }
                 }
               }
             }
@@ -81,7 +82,7 @@ namespace {
       }
 
       if (changed) {
-        return PreservedAnalyses::none();
+        out << "Changes were applied to the function \"" << F.getName() << "\".\n";
       }
       return PreservedAnalyses::all();
     }

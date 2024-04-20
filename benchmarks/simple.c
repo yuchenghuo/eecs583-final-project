@@ -17,8 +17,11 @@ int main()
     for (i = 0; i < SIZE; i++)
         in[i] *= i;
 
+    int sum = 0;
     for (j = 0; j< SIZE; j++)
-        fprintf(stdout,"%d\n", in[j]);
+        sum += in[j];
+
+    fprintf(stdout,"%d\n", sum);
 
     return 1;
 }

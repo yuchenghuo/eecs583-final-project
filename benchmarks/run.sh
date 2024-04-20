@@ -1,33 +1,56 @@
 #!/bin/bash
-# Run script for Loop Perforation Pass
-# Place this script in the benchmarks folder and run it using the name of the file (without the file type)
-# e.g. sh run.sh test1
+# Usage: sh run.sh filename (without extension)
+# Example: sh run.sh test1
 
-# ACTION NEEDED: Specify your build directory in the project where libLoopPerforationPass.so is located
+# Specify the path to the directory containing the LLVM pass plugin.
 PATH2LIB="../build/LoopPerforationPass"
+BENCH=${1}.c
 
-# Select the pass
+# Choose which pass to use. Uncomment the pass you want to use.
+#PASS="loop-count-pass"
 PASS="loop-perforation-pass"
 
-# Delete outputs from previous runs
-rm -f *.bc *.ll
+# Delete outputs from previous runs. Update this if you want to retain some files across runs.
+rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll *.in *.in.Z
 
-# Convert source code to LLVM IR bitcode.
-clang -emit-llvm -c ${1}.c -o ${1}.bc
+# Compile the C source file to LLVM IR (.bc) and then to human-readable LLVM IR (.ll).
+clang -emit-llvm -c ${BENCH} -Xclang -disable-O0-optnone -o ${1}.bc -Wno-deprecated-non-prototype -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 
-# Run the Loop Perforation Pass
-opt -load-pass-plugin="${PATH2LIB}/LoopPerforationPass.so" -passes="${PASS}" ${1}.bc -o ${1}_perforated.bc
+# Instrument profiler passes. Generates profile data.
+opt -passes='pgo-instr-gen,instrprof' ${1}.bc -o ${1}.prof.bc
 
-# Generate executable from original and transformed bitcode
-clang ${1}.bc -o ${1}
-clang ${1}_perforated.bc -o ${1}_perforated
+# Apply the LLVM pass using the opt tool and capture the output.
+clang -fprofile-instr-generate ${1}.prof.bc -o ${1}_prof -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 
-# Execute the original and perforated binaries
+if [ "${1}" = "anagram" ]; then
+./${1}_prof words < input.in > /dev/null 2>&1
+elif [ "${1}" = "compress" ];then
+./${1}_prof compress.in > /dev/null
+else
+./${1}_prof > /dev/null
+fi
+
+llvm-profdata merge -o ${1}.profdata default.profraw
+
+# The "Profile Guided Optimization Instrumentation-Use" pass attaches the profile data to the bc file.
+opt -passes="pgo-instr-use" -o ${1}.profdata.bc -pgo-test-profile-file=${1}.profdata < ${1}.bc
+
+# Optional: Convert the perforated bitcode back to human-readable LLVM IR for inspection.
+llvm-dis ${1}.bc -o ${1}.ll
+llvm-dis ${1}.profdata.bc -o ${1}.prof.ll
+
+opt --disable-output -load-pass-plugin="${PATH2LIB}/LoopPerforationPass.dylib" -passes="${PASS}" ${1}.profdata.bc
+
+# Compile the original and transformed LLVM IR to machine code executables.
+clang ${1}.bc -o "${1}" -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+clang ${1}.profdata.bc -o "${1}_perforated" -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+
+# Execute and compare the outputs of the original and perforated programs.
 echo -e "\n=== Execution Output ==="
 echo "Original Execution:"
-./${1}
+./"${1}"
 echo "Perforated Execution:"
-./${1}_perforated
+./"${1}_perforated"
 
-# Optional: Clean up (comment out these lines if you want to keep the files for analysis)
-# rm -f *.bc
+# Cleanup: Remove this if you want to retain the created files. And you do need to.
+rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *_perforated
