@@ -40,7 +40,7 @@ llvm-dis ${1}.perforated.bc -o ${1}.perforated.ll
 
 # Compile the original and transformed LLVM IR to machine code executables.
 clang ${1}.bc -o ${1}_no_perforated -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
-clang ${1}.perforated.bc -o ${1}_perforated -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+clang ${1}.perforated.bc -o ${1}_perforated -fprofile-instr-generate -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 
 # Execute and compare the outputs of the original and perforated programs.
 echo -e "\n=== Execution Output ==="
