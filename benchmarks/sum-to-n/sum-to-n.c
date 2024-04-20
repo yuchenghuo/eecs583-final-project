@@ -9,5 +9,5 @@ int sum_to_n(int n) {
 }
 
 int main(int argc, char const *argv[]) {
-    printf("%d\n", sum_to_n(100));
+    printf("%d\n", sum_to_n(5));
 }

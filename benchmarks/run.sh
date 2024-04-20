@@ -50,4 +50,4 @@ echo "Perforated Execution:"
 ./${1}_perforated
 
 # Cleanup: Remove this if you want to retain the created files. And you do need to.
-rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *_perforated simple example
+rm -f default.profraw *_prof *_fplicm *.bc *.profdata *_output *.ll *_perforated simple example
