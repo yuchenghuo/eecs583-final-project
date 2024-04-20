@@ -4,7 +4,7 @@
 
 # Specify the path to the directory containing the LLVM pass plugin.
 PATH2LIB="../build/LoopPerforationPass"
-BENCH=${1}.c
+BENCH=${1}/${1}.c
 
 # Choose which pass to use. Uncomment the pass you want to use.
 #PASS="loop-count-pass"
